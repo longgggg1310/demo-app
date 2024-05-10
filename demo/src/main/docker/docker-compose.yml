@@ -1,0 +1,80 @@
+version: '3'
+
+services:
+  minio:
+    image: quay.io/minio/minio
+    container_name: minio_vdt
+    environment:
+      - MINIO_ROOT_USER=minio_root
+      - MINIO_ROOT_PASSWORD=longvu123
+      - MINIO_ACCESS_KEY=ARPsMUtFIie2iy776FiZ
+      - MINIO_SECRET_KEY=jcfUdzBai3TSdo5gFzCH2xF47ybTY7jjIpzYjDug
+    volumes:
+      - ./minIO/data:/data
+    ports:
+      - 9000:9000
+      - 9001:9001
+    command: server /data --console-address ":9001"
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.7.1
+    container_name: elasticsearch
+    environment:
+      - xpack.security.enabled=false
+      - discovery.type=single-node
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    cap_add:
+      - IPC_LOCK
+    volumes:
+      - ./elasticsearch/data:/usr/share/elasticsearch/data
+    ports:
+      - 9200:9200
+      - 9300:9300
+  redis:
+    image: redis:latest
+    container_name: redis
+    volumes:
+      - ./redis/data:/data
+    ports:
+      - 6379:6379
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.7.1
+    container_name: kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - 5602:5601
+    depends_on:
+      - elasticsearch
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.7.1
+    container_name: logstash_vdt
+    volumes:
+      - ./logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+      - ./logstash/pipeline:/usr/share/logstash/pipeline:ro
+    ports:
+      - "5044:5044"
+      - "5000:5000/tcp"
+      - "5000:5000/udp"
+      - "9600:9600"
+    environment:
+      LS_JAVA_OPTS: "-Xmx256m -Xms256m"
+    depends_on:
+      - elasticsearch
+  db:
+    image: mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: 'longvu123'
+    ports:
+      # port exposed : mysql port running inside container
+      - "3306:3306"
+    volumes:
+      - ./data.sql:/docker-entrypoint-initdb.d/data.sql
